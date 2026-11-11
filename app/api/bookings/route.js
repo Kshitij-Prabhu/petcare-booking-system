@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPool, query } from '@/lib/mysql';
+import { bookingSlotConflictMessage, callProcedureWithOut, isBookingSlotConflict, query } from '@/lib/mysql';
 import { requireRole } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export async function GET(request) {
 }
 
 // POST /api/bookings — owner creates a booking via sp_create_booking
-// (stored procedure enforces the no-double-booking rule atomically).
+// (the unique index enforces the slot rule inside the booking/payment transaction).
 export async function POST(request) {
   const auth = requireRole(request, ['owner']);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
@@ -52,20 +52,18 @@ export async function POST(request) {
   }
   const amount = serviceRows[0].base_price;
 
-  const conn = await getPool().getConnection();
   try {
-    await conn.query(
+    const { booking_id } = await callProcedureWithOut(
       'CALL sp_create_booking(?, ?, ?, ?, ?, ?, ?, @booking_id)',
-      [pet_id, service_id, caregiver_id, booking_date, booking_time, amount, payment_method || 'upi']
+      [pet_id, service_id, caregiver_id, booking_date, booking_time, amount, payment_method || 'upi'],
+      ['booking_id']
     );
-    const [[{ booking_id }]] = await conn.query('SELECT @booking_id AS booking_id');
     return NextResponse.json({ booking_id }, { status: 201 });
   } catch (err) {
-    // SIGNAL from the stored procedure (double-booking) surfaces here as a 45000 error
-    const message = err.sqlMessage || err.message || 'Could not create booking';
-    const status = message.includes('already has a booking') ? 409 : 500;
-    return NextResponse.json({ error: message }, { status });
-  } finally {
-    conn.release();
+    if (isBookingSlotConflict(err)) {
+      return NextResponse.json({ error: bookingSlotConflictMessage }, { status: 409 });
+    }
+    console.error('Booking creation failed', err.code);
+    return NextResponse.json({ error: 'Could not create booking' }, { status: 500 });
   }
 }

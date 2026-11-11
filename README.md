@@ -103,6 +103,22 @@ All seeded accounts use password `password123`.
 | Owner | kshitij@petcare.test |
 | Caregiver | priya.cg@petcare.test |
 
+### Upgrade an existing MySQL database
+
+Pause the app and other booking writers. Back up the existing MySQL database,
+then apply the forward-only migration once using a MySQL account with routine
+and schema privileges. Select your existing database explicitly (usually
+`petcare_db`).
+
+```sh
+mysql --host=YOUR_HOST --port=3306 --user=YOUR_USER --password petcare_db \
+  < sql/migrations/001_reuse_cancelled_slots.sql
+```
+
+Start the updated app after the migration succeeds. Existing bookings and
+payments are preserved. Use `npm run db:init` only on a disposable or fresh
+database because it drops and recreates `petcare_db`. MongoDB needs no migration.
+
 ## 6. Database Choice & Justification
 **MySQL** is mandatory and is the system of record for everything with a
 fixed shape and hard relational constraints — users, pets, services,
@@ -118,7 +134,8 @@ Manual test cases (also see `docs/testing.md`):
 1. Register as owner → add a pet → book a service → verify it appears
    under "My Bookings" with status `pending`.
 2. Try booking the same caregiver for the same date/time twice →
-   second request must fail with **409** (stored-procedure `SIGNAL`).
+   second request must fail with **409**. Cancel the first booking and
+   retry the same slot to verify that the old booking stays in the history.
 3. Login as the caregiver → advance the booking through
    `confirmed → in_progress → completed` → confirm `caregiver_stats.
    completed_bookings` increments (trigger) via the Admin panel workload

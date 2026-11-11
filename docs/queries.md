@@ -45,10 +45,11 @@ Exposed via `GET /api/services?q=overnight+boarding`, used on the
 "Book a Service" page's search box.
 
 ## 6. Transaction (stored procedure)
-`sp_create_booking` (sql/schema.sql) wraps the slot-conflict check, the
-`INSERT INTO bookings`, and the `INSERT INTO payments` in a single
-`START TRANSACTION ... COMMIT`, with `SIGNAL` + `ROLLBACK` on conflict.
-Called from `app/api/bookings/route.js`.
+`sp_create_booking` (sql/schema.sql) wraps `INSERT INTO bookings` and
+`INSERT INTO payments` in a single transaction. The unique index
+`uq_caregiver_active_slot` arbitrates concurrent writes. On any SQL
+exception, the procedure rolls back and propagates the original error.
+`app/api/bookings/route.js` maps a duplicate on this index to HTTP 409.
 
 ## 7. Trigger
 `trg_booking_status_update` (sql/schema.sql) fires `AFTER UPDATE ON
