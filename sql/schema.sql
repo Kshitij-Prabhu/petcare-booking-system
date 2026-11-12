@@ -87,6 +87,7 @@ CREATE TABLE bookings (
     booking_time    TIME NOT NULL,
     status          ENUM('pending', 'confirmed', 'in_progress', 'completed', 'cancelled')
                         NOT NULL DEFAULT 'pending',
+    active_slot     TINYINT GENERATED ALWAYS AS (CASE WHEN status <> 'cancelled' THEN 1 END) VIRTUAL,
     amount          DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
     pet_id          INT NOT NULL,
     service_id      INT NOT NULL,
@@ -99,11 +100,11 @@ CREATE TABLE bookings (
         REFERENCES services(service_id) ON DELETE RESTRICT,
     CONSTRAINT fk_booking_caregiver FOREIGN KEY (caregiver_id)
         REFERENCES caregivers(caregiver_id) ON DELETE RESTRICT,
-    CONSTRAINT uq_caregiver_slot UNIQUE (caregiver_id, booking_date, booking_time)
+    -- MySQL permits multiple NULLs in a UNIQUE index, so cancellations free the slot.
+    CONSTRAINT uq_caregiver_active_slot UNIQUE (caregiver_id, booking_date, booking_time, active_slot)
 );
 
--- Composite index supporting the conflict-check query inside sp_create_booking
--- and the "caregiver's schedule" lookups used by the dashboard.
+-- Composite index for caregiver schedule lookups, including cancelled bookings.
 CREATE INDEX idx_bookings_caregiver_schedule ON bookings(caregiver_id, booking_date, booking_time);
 CREATE INDEX idx_bookings_owner_lookup ON bookings(pet_id, status);
 
@@ -141,7 +142,6 @@ CREATE TABLE caregiver_stats (
 -- the initial design; left here as evidence/documentation.
 -- ----------------------------------------------------------------------------
 -- ALTER TABLE caregivers ADD COLUMN is_available BOOLEAN DEFAULT TRUE;
--- ALTER TABLE bookings ADD CONSTRAINT uq_caregiver_slot UNIQUE (caregiver_id, booking_date, booking_time);
 -- DROP INDEX idx_pets_owner ON pets;  -- example of DROP, re-created above
 
 -- ============================================================================
@@ -194,9 +194,8 @@ HAVING COUNT(b.booking_id) >= 0;
 
 -- ============================================================================
 -- STORED PROCEDURE — sp_create_booking
--- Demonstrates: Transactions + conflict-checking business logic inside the DB
--- Wraps booking + payment insert in a single atomic transaction and raises
--- a signal (rolling the transaction back) if the caregiver's slot is taken.
+-- The unique index arbitrates concurrent inserts. A conflict rolls back
+-- the transaction, which creates the booking and payment together.
 -- ============================================================================
 DELIMITER $$
 
@@ -211,8 +210,6 @@ CREATE PROCEDURE sp_create_booking (
     OUT p_booking_id    INT
 )
 BEGIN
-    DECLARE v_conflict INT DEFAULT 0;
-
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
@@ -220,20 +217,6 @@ BEGIN
     END;
 
     START TRANSACTION;
-
-    -- Lock the caregiver's existing bookings for this slot to prevent a race
-    SELECT COUNT(*) INTO v_conflict
-    FROM bookings
-    WHERE caregiver_id = p_caregiver_id
-      AND booking_date = p_booking_date
-      AND booking_time = p_booking_time
-      AND status NOT IN ('cancelled')
-    FOR UPDATE;
-
-    IF v_conflict > 0 THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Caregiver already has a booking at this date/time';
-    END IF;
 
     INSERT INTO bookings (booking_date, booking_time, status, amount, pet_id, service_id, caregiver_id)
     VALUES (p_booking_date, p_booking_time, 'pending', p_amount, p_pet_id, p_service_id, p_caregiver_id);

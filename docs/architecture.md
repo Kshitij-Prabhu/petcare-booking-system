@@ -40,13 +40,14 @@ assigned `caregiver` can advance its status).
 ## Data validation & integrity
 - Database level: `CHECK` constraints (age range, non-negative price,
   rating bounds via MongoDB app-layer validation), `ENUM` columns,
-  `UNIQUE(caregiver_id, booking_date, booking_time)` to block double
-  bookings, foreign keys with explicit `ON DELETE` behavior.
+  a unique index on `(caregiver_id, booking_date, booking_time, active_slot)`,
+  and foreign keys with explicit `ON DELETE` behavior. The generated
+  `active_slot` is `NULL` on cancelled bookings so they free their slot.
 - Application level: required-field checks in every API route before any
   query runs, ownership checks (an owner can only edit *their* pets/
-  bookings), and the `sp_create_booking` transaction re-checks the
-  conflict under `FOR UPDATE` locking to close the race condition a
-  pure application-level check could miss.
+  bookings), and HTTP 409 for conflicts on `uq_caregiver_active_slot`.
+  MySQL enforces uniqueness during concurrent writes and
+  `sp_create_booking` commits the booking and payment together.
 
 ## Environment configuration
 All credentials (MySQL + MongoDB connection strings, JWT secret) are

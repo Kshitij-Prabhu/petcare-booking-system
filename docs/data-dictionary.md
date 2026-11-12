@@ -56,12 +56,13 @@
 | booking_date | DATE | NOT NULL |
 | booking_time | TIME | NOT NULL |
 | status | ENUM('pending','confirmed','in_progress','completed','cancelled') | DEFAULT 'pending' |
+| active_slot | TINYINT | Virtual generated column. Equals `1` for any status other than `cancelled` and `NULL` for cancelled bookings. |
 | amount | DECIMAL(10,2) | CHECK >= 0 |
 | pet_id | INT | FK → pets.pet_id (ON DELETE CASCADE) |
 | service_id | INT | FK → services.service_id (ON DELETE RESTRICT) |
 | caregiver_id | INT | FK → caregivers.caregiver_id (ON DELETE RESTRICT) |
 | created_at / updated_at | TIMESTAMP | auto-managed |
-| — | UNIQUE(caregiver_id, booking_date, booking_time) | prevents double-booking |
+| — | UNIQUE(caregiver_id, booking_date, booking_time, active_slot) | `uq_caregiver_active_slot` allows one non-cancelled booking per slot. MySQL permits multiple `NULL` keys for the cancelled history. |
 
 ### payments
 | Column | Type | Constraints |

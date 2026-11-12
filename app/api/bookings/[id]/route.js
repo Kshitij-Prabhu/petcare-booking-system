@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/mysql';
+import { bookingSlotConflictMessage, isBookingSlotConflict, query } from '@/lib/mysql';
 import { requireRole } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,14 @@ export async function PATCH(request, { params }) {
   }
   // admin may set any status
 
-  await query('UPDATE bookings SET status = ? WHERE booking_id = ?', [status, bookingId]);
+  try {
+    await query('UPDATE bookings SET status = ? WHERE booking_id = ?', [status, bookingId]);
+  } catch (err) {
+    if (isBookingSlotConflict(err)) {
+      return NextResponse.json({ error: bookingSlotConflictMessage }, { status: 409 });
+    }
+    throw err;
+  }
 
   if (status === 'cancelled') {
     await query('UPDATE payments SET payment_status = ? WHERE booking_id = ?', ['refunded', bookingId]);
