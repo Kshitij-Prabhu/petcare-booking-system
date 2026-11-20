@@ -49,7 +49,7 @@ export default function AdminPage() {
         <h3>Caregiver Workload</h3>
         <table>
           <thead>
-            <tr><th>Caregiver</th><th>Total Bookings</th><th>Completed</th><th>Revenue</th></tr>
+            <tr><th>Caregiver</th><th>Total Bookings</th><th>Completed</th><th>Completed Revenue</th></tr>
           </thead>
           <tbody>
             {workload.map((w) => (

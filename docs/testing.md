@@ -1,5 +1,37 @@
 # Testing Results
 
+## Local verification before publishing (20 November 2026)
+
+Ran the production build and browser checks against the existing local
+MySQL and MongoDB demo databases with separate Ashwin, Priya, Rahul, and
+admin sessions.
+
+- Ashwin created two Vet Home Visit bookings for Whiskers with Priya on
+  4 December 2026 at 14:50 and 15:00 (booking IDs 17 and 18). Priya's
+  Confirmed, In Progress, and Completed actions returned HTTP 200, and
+  both completed bookings showed paid payments.
+- The 14:50 booking showed No review yet. Ashwin submitted a 5-star
+  review for the 15:00 booking with HTTP 201. My Bookings showed Reviewed
+  immediately and after refresh, while the unreviewed booking still
+  offered Leave Review.
+- Priya's My Jobs displayed the new review on its matching booking.
+  Earlier reviewed bookings retained their corresponding text and rating.
+- Refreshing Priya's dashboard changed her average from 4.33 to 4.43 and
+  her count from 6 to 7 reviews. Browse Caregivers showed the same values.
+  Rahul's dashboard showed No ratings yet.
+- Rahul's booking list contained only his jobs, including when a request
+  supplied Priya's caregiver ID and booking ID. Direct GET requests to the
+  retired review endpoint and the booking status endpoint returned HTTP
+  405 without review content.
+- The admin dashboard rendered and its stats returned HTTP 200. Every
+  caregiver workload revenue and the platform completed revenue matched
+  completed-only MySQL sums. The original completed seed booking's
+  payment was paid.
+- `npm run build` and `git diff --check` passed.
+
+The seed payment initialization change was inspected. This run reused
+existing data and did not execute the seed script.
+
 ## Solo verification on merged main (12 November 2026)
 
 Tested merge commit `1c94f1e` on one Mac with separate Chrome sessions

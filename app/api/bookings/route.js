@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { bookingSlotConflictMessage, callProcedureWithOut, isBookingSlotConflict, query } from '@/lib/mysql';
+import { getReviewsCollection } from '@/lib/mongo';
 import { requireRole } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -15,11 +16,48 @@ export async function GET(request) {
       'SELECT * FROM vw_booking_details WHERE owner_email = ? ORDER BY booking_date DESC, booking_time DESC',
       [auth.user.email]
     );
+    const completed = rows.filter((booking) => booking.status === 'completed');
+    if (completed.length > 0) {
+      try {
+        const reviews = await getReviewsCollection();
+        const reviewedIds = new Set(await reviews.distinct('booking_id', {
+          owner_id: auth.user.user_id,
+          booking_id: { $in: completed.map((booking) => booking.booking_id) },
+        }));
+        for (const booking of completed) {
+          booking.reviewed = reviewedIds.has(booking.booking_id);
+        }
+      } catch (err) {
+        console.error('Could not load booking review status', err.code || err.name);
+      }
+    }
   } else if (auth.user.role === 'caregiver') {
     rows = await query(
       'SELECT * FROM vw_booking_details WHERE caregiver_id = ? ORDER BY booking_date DESC, booking_time DESC',
       [auth.user.user_id]
     );
+    const completed = rows.filter((booking) => booking.status === 'completed');
+    if (completed.length > 0) {
+      try {
+        const reviews = await getReviewsCollection();
+        const docs = await reviews.find(
+          {
+            caregiver_id: auth.user.user_id,
+            booking_id: { $in: completed.map((booking) => booking.booking_id) },
+          },
+          { projection: { _id: 0, booking_id: 1, rating: 1, comment: 1 } }
+        ).sort({ created_at: -1, _id: -1 }).toArray();
+        const byBookingId = new Map();
+        for (const { booking_id, rating, comment } of docs) {
+          if (!byBookingId.has(booking_id)) byBookingId.set(booking_id, { rating, comment });
+        }
+        for (const booking of completed) {
+          booking.review = byBookingId.get(booking.booking_id) ?? null;
+        }
+      } catch (err) {
+        console.error('Could not load job reviews', err.code || err.name);
+      }
+    }
   } else {
     rows = await query('SELECT * FROM vw_booking_details ORDER BY booking_date DESC, booking_time DESC');
   }

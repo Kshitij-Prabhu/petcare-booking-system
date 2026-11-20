@@ -46,6 +46,9 @@ export default function BookingsPage() {
       body: JSON.stringify({ booking_id: reviewFor, rating: Number(reviewForm.rating), comment: reviewForm.comment }),
     });
     if (res.ok) {
+      setBookings((current) => current.map((booking) =>
+        booking.booking_id === reviewFor ? { ...booking, reviewed: true } : booking
+      ));
       setReviewFor(null);
       setReviewForm({ rating: 5, comment: '' });
       alert('Review submitted!');
@@ -73,6 +76,7 @@ export default function BookingsPage() {
             <th>Status</th>
             <th>Payment</th>
             <th>Actions</th>
+            {user?.role === 'caregiver' && <th>Owner Review</th>}
           </tr>
         </thead>
         <tbody>
@@ -90,8 +94,11 @@ export default function BookingsPage() {
                 {user?.role === 'owner' && !['completed', 'cancelled'].includes(b.status) && (
                   <button className="danger" onClick={() => updateStatus(b.booking_id, 'cancelled')}>Cancel</button>
                 )}
-                {user?.role === 'owner' && b.status === 'completed' && (
+                {user?.role === 'owner' && b.status === 'completed' && b.reviewed === false && (
                   <button className="secondary" onClick={() => setReviewFor(b.booking_id)}>Leave Review</button>
+                )}
+                {user?.role === 'owner' && b.status === 'completed' && b.reviewed !== false && (
+                  <span className="muted">{b.reviewed ? 'Reviewed' : 'Review status unavailable'}</span>
                 )}
                 {user?.role === 'caregiver' && CAREGIVER_NEXT[b.status] && (
                   <button onClick={() => updateStatus(b.booking_id, CAREGIVER_NEXT[b.status])}>
@@ -102,10 +109,24 @@ export default function BookingsPage() {
                   <button className="danger" onClick={() => updateStatus(b.booking_id, 'cancelled')}>Cancel</button>
                 )}
               </td>
+              {user?.role === 'caregiver' && (
+                <td className="booking-review">
+                  {b.status === 'completed' && (b.review ? (
+                    <>
+                      <span className="stars" aria-hidden="true">★</span> {b.review.rating} / 5
+                      {b.review.comment && <div className="booking-review-comment">{b.review.comment}</div>}
+                    </>
+                  ) : (
+                    <span className="muted">
+                      {b.review === null ? 'No review yet' : 'Review status unavailable'}
+                    </span>
+                  ))}
+                </td>
+              )}
             </tr>
           ))}
           {bookings.length === 0 && (
-            <tr><td colSpan={8} className="muted">No bookings yet.</td></tr>
+            <tr><td colSpan={user?.role === 'caregiver' ? 9 : 8} className="muted">No bookings yet.</td></tr>
           )}
         </tbody>
       </table>
