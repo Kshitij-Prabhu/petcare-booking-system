@@ -5,23 +5,6 @@ import { requireRole } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/reviews?caregiver_id=5 — reviews for one caregiver
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const caregiverId = searchParams.get('caregiver_id');
-  if (!caregiverId) {
-    return NextResponse.json({ error: 'caregiver_id query param is required' }, { status: 400 });
-  }
-
-  const reviews = await getReviewsCollection();
-  const docs = await reviews
-    .find({ caregiver_id: Number(caregiverId) })
-    .sort({ created_at: -1 })
-    .toArray();
-
-  return NextResponse.json({ reviews: docs });
-}
-
 // POST /api/reviews — owner leaves a review for a completed booking
 // body: { booking_id, rating, comment, photos: [url, ...] }
 export async function POST(request) {

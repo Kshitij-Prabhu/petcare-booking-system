@@ -130,4 +130,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 
 .stars { color: #d9a441; letter-spacing: 1px; }
 
+.booking-review { max-width: 18rem; }
+.booking-review-comment { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .muted { color: var(--muted); font-size: 13px; }

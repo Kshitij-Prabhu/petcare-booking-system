@@ -87,8 +87,11 @@ async function main() {
   ]);
   const [[b2]] = await conn.query('SELECT @bid2 AS booking_id');
 
-  // Mark the first booking completed to demonstrate the trigger + reviews flow
+  // Complete the first booking and mark its payment paid for the reviews demo.
   await conn.query('UPDATE bookings SET status = ? WHERE booking_id = ?', ['completed', b1.booking_id]);
+  await conn.query('UPDATE payments SET payment_status = ?, paid_at = NOW() WHERE booking_id = ?', [
+    'paid', b1.booking_id,
+  ]);
 
   conn.release();
 

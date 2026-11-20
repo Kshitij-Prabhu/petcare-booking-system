@@ -115,6 +115,14 @@ mysql --host=YOUR_HOST --port=3306 --user=YOUR_USER --password petcare_db \
   < sql/migrations/001_reuse_cancelled_slots.sql
 ```
 
+For databases that already include the cancelled-slot fix, apply the completed
+revenue view migration. Fresh installs include both changes in `sql/schema.sql`.
+
+```sh
+mysql --host=YOUR_HOST --port=3306 --user=YOUR_USER --password petcare_db \
+  < sql/migrations/002_completed_workload_revenue.sql
+```
+
 Start the updated app after the migration succeeds. Existing bookings and
 payments are preserved. Use `npm run db:init` only on a disposable or fresh
 database because it drops and recreates `petcare_db`. MongoDB needs no migration.

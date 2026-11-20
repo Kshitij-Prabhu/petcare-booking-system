@@ -125,7 +125,7 @@ for the full justification in context.
   application layer (checked before insert; can be added as a MongoDB
   unique index with `db.reviews.createIndex({booking_id:1},{unique:true})`).
 
-**Retrieval strategy:** `GET /api/reviews?caregiver_id=X` does a simple
-`find` + sort; `GET /api/caregivers` and `GET /api/admin/stats` run an
-aggregation pipeline (`$group` with `$avg` / `$sum`) to compute rollups
-without a separate ETL step.
+**Retrieval strategy:** `GET /api/bookings` batches review lookups by
+completed booking IDs and the signed-in caregiver's ID. Browse Caregivers
+and the caregiver dashboard use `GET /api/caregivers` for rating averages
+and review counts. `GET /api/admin/stats` aggregates platform-wide ratings.
